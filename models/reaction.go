@@ -2,7 +2,6 @@ package models
 
 import (
 	"encoding/json"
-	"fmt"
 )
 
 // ReactionTypeType https://core.telegram.org/bots/api#reactiontype
@@ -31,36 +30,37 @@ func (rt *ReactionType) MarshalJSON() ([]byte, error) {
 	case ReactionTypeTypeCustomEmoji:
 		rt.ReactionTypeCustomEmoji.Type = ReactionTypeTypeCustomEmoji
 		return json.Marshal(rt.ReactionTypeCustomEmoji)
+	case ReactionTypeTypePaid:
+		rt.ReactionTypePaid.Type = string(ReactionTypeTypePaid)
+		return json.Marshal(rt.ReactionTypePaid)
 	}
 
-	return nil, fmt.Errorf("unsupported ReactionType type")
+	return marshalUnknownVariant("ReactionType", "type", rt.Type)
 }
 
 func (rt *ReactionType) UnmarshalJSON(data []byte) error {
 	v := struct {
-		Type string `json:"type"`
+		Type ReactionTypeType `json:"type"`
 	}{}
 	err := json.Unmarshal(data, &v)
 	if err != nil {
 		return err
 	}
 
+	rt.Type = v.Type
+
 	switch v.Type {
-	case "emoji":
-		rt.Type = ReactionTypeTypeEmoji
+	case ReactionTypeTypeEmoji:
 		rt.ReactionTypeEmoji = &ReactionTypeEmoji{}
 		return json.Unmarshal(data, rt.ReactionTypeEmoji)
-	case "custom_emoji":
-		rt.Type = ReactionTypeTypeCustomEmoji
+	case ReactionTypeTypeCustomEmoji:
 		rt.ReactionTypeCustomEmoji = &ReactionTypeCustomEmoji{}
 		return json.Unmarshal(data, rt.ReactionTypeCustomEmoji)
-	case "paid":
-		rt.Type = ReactionTypeTypePaid
+	case ReactionTypeTypePaid:
 		rt.ReactionTypePaid = &ReactionTypePaid{}
 		return json.Unmarshal(data, rt.ReactionTypePaid)
 	}
 
-	rt.Type = ReactionTypeType(v.Type)
 	return nil
 }
 

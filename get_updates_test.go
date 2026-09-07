@@ -8,20 +8,21 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/go-telegram/bot/models"
 )
 
-type clientFunc func(*http.Request) (*http.Response, error)
+type getUpdatesClientFunc func(*http.Request) (*http.Response, error)
 
-func (f clientFunc) Do(req *http.Request) (*http.Response, error) {
+func (f getUpdatesClientFunc) Do(req *http.Request) (*http.Response, error) {
 	// drain the multipart body so the request pipe writer can finish
 	_, _ = io.Copy(io.Discard, req.Body)
 	_ = req.Body.Close()
 	return f(req)
 }
 
-func jsonResponse(body string) *http.Response {
+func getUpdatesJSONResponse(body string) *http.Response {
 	return &http.Response{
 		StatusCode: http.StatusOK,
 		Body:       io.NopCloser(strings.NewReader(body)),
@@ -45,14 +46,14 @@ func Test_getUpdates_skipsUndecodableUpdate(t *testing.T) {
 	b := &Bot{
 		token:         "XXX",
 		updates:       make(chan *models.Update, 10),
-		errorsHandler: func(err error) { errs = append(errs, err.Error()) },
+		errorsHandler: func(handlerErr error) { errs = append(errs, handlerErr.Error()) },
 		debugHandler:  func(string, ...any) {},
-		client: clientFunc(func(*http.Request) (*http.Response, error) {
+		client: getUpdatesClientFunc(func(*http.Request) (*http.Response, error) {
 			if atomic.AddInt32(&calls, 1) > 1 {
 				cancel()
 				return nil, ctx.Err()
 			}
-			return jsonResponse(batch), nil
+			return getUpdatesJSONResponse(batch), nil
 		}),
 	}
 
@@ -70,7 +71,48 @@ func Test_getUpdates_skipsUndecodableUpdate(t *testing.T) {
 	if first, third := <-b.updates, <-b.updates; first.ID != 100 || third.ID != 102 {
 		t.Fatalf("expected updates 100 and 102, got %d and %d", first.ID, third.ID)
 	}
-	if len(errs) != 1 || !strings.Contains(errs[0], "101") {
-		t.Fatalf("undecodable update must be reported once with its id, got %v", errs)
+	if len(errs) != 1 || !strings.Contains(errs[0], "101") || !strings.Contains(errs[0], "not an object") {
+		t.Fatalf("undecodable update must be reported once with its id and raw payload, got %v", errs)
+	}
+}
+
+// An update whose id cannot be read leaves the offset where it is, so the very same
+// batch comes back on the next request. Without a backoff that is a tight loop.
+func Test_getUpdates_backsOffWhenUpdateIDUnreadable(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	batch := `{"ok":true,"result":[{"update_id":"abc","message":"x"}]}`
+
+	var calls int
+	var firstCallAt time.Time
+	var gap time.Duration
+
+	b := &Bot{
+		token:         "XXX",
+		updates:       make(chan *models.Update, 10),
+		errorsHandler: func(error) {},
+		debugHandler:  func(string, ...any) {},
+		client: getUpdatesClientFunc(func(*http.Request) (*http.Response, error) {
+			calls++
+			switch calls {
+			case 1:
+				firstCallAt = time.Now()
+			case 2:
+				gap = time.Since(firstCallAt)
+				cancel()
+				return nil, ctx.Err()
+			}
+			return getUpdatesJSONResponse(batch), nil
+		}),
+	}
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	b.getUpdates(ctx, &wg)
+	wg.Wait()
+
+	if gap < 100*time.Millisecond {
+		t.Fatalf("expected a backoff before the next request, got %v", gap)
 	}
 }

@@ -111,40 +111,36 @@ func (s *StoryAreaType) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &v); err != nil {
 		return err
 	}
+	s.Type = v.Type
+
 	switch v.Type {
 	case StoryAreaTypeTypeLocation:
-		s.Type = StoryAreaTypeTypeLocation
 		s.StoryAreaTypeLocation = &StoryAreaTypeLocation{
 			Type: StoryAreaTypeTypeLocation,
 		}
 		return json.Unmarshal(data, s.StoryAreaTypeLocation)
 	case StoryAreaTypeTypeSuggestedReaction:
-		s.Type = StoryAreaTypeTypeSuggestedReaction
 		s.StoryAreaTypeSuggestedReaction = &StoryAreaTypeSuggestedReaction{
 			Type: StoryAreaTypeTypeSuggestedReaction,
 		}
 		return json.Unmarshal(data, s.StoryAreaTypeSuggestedReaction)
 	case StoryAreaTypeTypeLink:
-		s.Type = StoryAreaTypeTypeLink
 		s.StoryAreaTypeLink = &StoryAreaTypeLink{
 			Type: StoryAreaTypeTypeLink,
 		}
 		return json.Unmarshal(data, s.StoryAreaTypeLink)
 	case StoryAreaTypeTypeWeather:
-		s.Type = StoryAreaTypeTypeWeather
 		s.StoryAreaTypeWeather = &StoryAreaTypeWeather{
 			Type: StoryAreaTypeTypeWeather,
 		}
 		return json.Unmarshal(data, s.StoryAreaTypeWeather)
 	case StoryAreaTypeTypeUniqueGift:
-		s.Type = StoryAreaTypeTypeUniqueGift
 		s.StoryAreaTypeUniqueGift = &StoryAreaTypeUniqueGift{
 			Type: StoryAreaTypeTypeUniqueGift,
 		}
 		return json.Unmarshal(data, s.StoryAreaTypeUniqueGift)
 	}
 
-	s.Type = v.Type
 	return nil
 }
 

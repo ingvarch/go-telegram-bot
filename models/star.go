@@ -38,38 +38,32 @@ func (m *TransactionPartner) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
+	m.Type = v.Type
+
 	switch v.Type {
 	case TransactionPartnerTypeUser:
-		m.Type = TransactionPartnerTypeUser
 		m.User = &TransactionPartnerUser{}
 		return json.Unmarshal(data, m.User)
 	case TransactionPartnerTypeChat:
-		m.Type = TransactionPartnerTypeChat
 		m.Chat = &TransactionPartnerChat{}
 		return json.Unmarshal(data, m.Chat)
 	case TransactionPartnerTypeAffiliateProgram:
-		m.Type = TransactionPartnerTypeAffiliateProgram
 		m.AffiliateProgram = &TransactionPartnerAffiliateProgram{}
 		return json.Unmarshal(data, m.AffiliateProgram)
 	case TransactionPartnerTypeFragment:
-		m.Type = TransactionPartnerTypeFragment
 		m.Fragment = &TransactionPartnerFragment{}
 		return json.Unmarshal(data, m.Fragment)
 	case TransactionPartnerTypeTelegramAds:
-		m.Type = TransactionPartnerTypeTelegramAds
 		m.TelegramAds = &TransactionPartnerTelegramAds{}
 		return json.Unmarshal(data, m.TelegramAds)
 	case TransactionPartnerTypeTelegramApi:
-		m.Type = TransactionPartnerTypeTelegramApi
 		m.TelegramApi = &TransactionPartnerTelegramApi{}
 		return json.Unmarshal(data, m.TelegramApi)
 	case TransactionPartnerTypeOther:
-		m.Type = TransactionPartnerTypeOther
 		m.Other = &TransactionPartnerOther{}
 		return json.Unmarshal(data, m.Other)
 	}
 
-	m.Type = v.Type
 	return nil
 }
 
@@ -158,22 +152,20 @@ func (m *RevenueWithdrawalState) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
+	m.Type = v.Type
+
 	switch v.Type {
 	case RevenueWithdrawalStateTypePending:
-		m.Type = RevenueWithdrawalStateTypePending
 		m.Pending = &RevenueWithdrawalStatePending{}
 		return json.Unmarshal(data, m.Pending)
 	case RevenueWithdrawalStateTypeSucceeded:
-		m.Type = RevenueWithdrawalStateTypeSucceeded
 		m.Succeeded = &RevenueWithdrawalStateSucceeded{}
 		return json.Unmarshal(data, m.Succeeded)
 	case RevenueWithdrawalStateTypeFailed:
-		m.Type = RevenueWithdrawalStateTypeFailed
 		m.Failed = &RevenueWithdrawalStateFailed{}
 		return json.Unmarshal(data, m.Failed)
 	}
 
-	m.Type = v.Type
 	return nil
 }
 

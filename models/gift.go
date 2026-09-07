@@ -57,22 +57,21 @@ func (g *OwnedGift) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
+	g.Type = v.Type
+
 	switch v.Type {
 	case OwnedGiftTypeRegular:
-		g.Type = OwnedGiftTypeRegular
 		g.OwnedGiftRegular = &OwnedGiftRegular{
 			Type: OwnedGiftTypeRegular,
 		}
 		return json.Unmarshal(data, g.OwnedGiftRegular)
 	case OwnedGiftTypeUnique:
-		g.Type = OwnedGiftTypeUnique
 		g.OwnedGiftUnique = &OwnedGiftUnique{
 			Type: OwnedGiftTypeUnique,
 		}
 		return json.Unmarshal(data, g.OwnedGiftUnique)
 	}
 
-	g.Type = v.Type
 	return nil
 }
 

@@ -52,8 +52,8 @@ func TestPolymorphicUnmarshal_UnknownDiscriminator(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if err := json.Unmarshal([]byte(c.src), c.dst); err != nil {
-				t.Fatalf("unknown discriminator must not fail: %v", err)
+			if unmarshalErr := json.Unmarshal([]byte(c.src), c.dst); unmarshalErr != nil {
+				t.Fatalf("unknown discriminator must not fail: %v", unmarshalErr)
 			}
 			if got := c.typ(); got != unknownType {
 				t.Fatalf("discriminator lost: got %q", got)
@@ -72,5 +72,108 @@ func assertNoVariantSet(t *testing.T, dst any) {
 		if f.Kind() == reflect.Pointer && !f.IsNil() {
 			t.Fatalf("variant %s set for unknown type", v.Type().Field(i).Name)
 		}
+	}
+}
+
+// A value decoded from a newer Bot API release must survive a round trip. Anyone who
+// logs, persists or queues updates as JSON, or echoes a value back into a request,
+// would otherwise break on the day Telegram ships a new variant.
+func TestPolymorphicMarshal_UnknownDiscriminator(t *testing.T) {
+	cases := []struct {
+		name  string
+		value json.Unmarshaler
+	}{
+		{"ChatMember", &ChatMember{}},
+		{"ReactionType", &ReactionType{}},
+		{"ChatBoostSource", &ChatBoostSource{}},
+		{"MenuButton", &MenuButton{}},
+		{"MessageOrigin", &MessageOrigin{}},
+		{"BackgroundType", &BackgroundType{}},
+		{"BackgroundFill", &BackgroundFill{}},
+		{"RichBlock", &RichBlock{}},
+		{"RichText", &RichText{}},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			field := "type"
+			switch c.name {
+			case "ChatMember":
+				field = "status"
+			case "ChatBoostSource":
+				field = "source"
+			}
+			src := `{"` + field + `":"` + unknownType + `"}`
+
+			if unmarshalErr := json.Unmarshal([]byte(src), c.value); unmarshalErr != nil {
+				t.Fatalf("unknown discriminator must not fail to decode: %v", unmarshalErr)
+			}
+
+			out, marshalErr := json.Marshal(c.value)
+			if marshalErr != nil {
+				t.Fatalf("unknown discriminator must not fail to encode: %v", marshalErr)
+			}
+			if string(out) != src {
+				t.Fatalf("round-trip mismatch:\n got %s\nwant %s", out, src)
+			}
+		})
+	}
+}
+
+// An empty discriminator is an unset value, not a variant from a future release:
+// there is no payload to encode, so it stays an error.
+func TestPolymorphicMarshal_EmptyDiscriminator(t *testing.T) {
+	// RichText is absent on purpose: an empty Type is its plain-string form.
+	cases := []struct {
+		name  string
+		value json.Marshaler
+	}{
+		{"ChatMember", &ChatMember{}},
+		{"ReactionType", &ReactionType{}},
+		{"ChatBoostSource", &ChatBoostSource{}},
+		{"MenuButton", &MenuButton{}},
+		{"MessageOrigin", &MessageOrigin{}},
+		{"BackgroundType", &BackgroundType{}},
+		{"BackgroundFill", &BackgroundFill{}},
+		{"RichBlock", &RichBlock{}},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if _, marshalErr := c.value.MarshalJSON(); marshalErr == nil {
+				t.Fatal("expected an error for an empty discriminator")
+			}
+		})
+	}
+}
+
+// ReactionTypePaid is a known variant since Bot API 7.6, but MarshalJSON never had a
+// case for it, so a paid reaction read from an update could not be sent back.
+func TestReactionType_PaidRoundTrip(t *testing.T) {
+	src := `{"type":"paid"}`
+
+	rt := &ReactionType{}
+	if unmarshalErr := json.Unmarshal([]byte(src), rt); unmarshalErr != nil {
+		t.Fatalf("decode: %v", unmarshalErr)
+	}
+	if rt.ReactionTypePaid == nil {
+		t.Fatal("paid variant not populated")
+	}
+
+	out, marshalErr := json.Marshal(rt)
+	if marshalErr != nil {
+		t.Fatalf("encode: %v", marshalErr)
+	}
+	if string(out) != src {
+		t.Fatalf("round-trip mismatch:\n got %s\nwant %s", out, src)
+	}
+}
+
+// An empty Type is RichText's plain-string form, so a tagged object without a "type"
+// must not decode into it: that would silently alias a malformed value to "".
+func TestRichText_ObjectWithoutType(t *testing.T) {
+	var rt RichText
+	if unmarshalErr := json.Unmarshal([]byte(`{"text":"hi"}`), &rt); unmarshalErr == nil {
+		t.Fatal("expected an error for a tagged object without a type")
 	}
 }

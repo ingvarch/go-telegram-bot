@@ -80,13 +80,19 @@ func (b *Bot) getUpdates(ctx context.Context, wg *sync.WaitGroup) {
 
 		for _, raw := range updates {
 			upd, errDecode := decodeUpdate(raw)
-			if upd.ID != 0 {
-				atomic.StoreInt64(&b.lastUpdateID, upd.ID)
-			}
 			if errDecode != nil {
-				b.error("error decode update %d, skipped, %w", upd.ID, errDecode)
+				b.error("error decode update %d, skipped, %s, %w", upd.ID, raw, errDecode)
+				if upd.ID == 0 {
+					// The id could not be read, so the offset cannot move past this
+					// update and the same batch comes back. Back off as on a failed
+					// request instead of re-requesting it at full speed.
+					timeoutAfterError = incErrTimeout(timeoutAfterError)
+					continue
+				}
+				atomic.StoreInt64(&b.lastUpdateID, upd.ID)
 				continue
 			}
+			atomic.StoreInt64(&b.lastUpdateID, upd.ID)
 			select {
 			case <-ctx.Done():
 				b.error("some updates lost, ctx done")
